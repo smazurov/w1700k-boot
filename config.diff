@@ -4,6 +4,7 @@ CONFIG_TARGET_airoha_an7581_DEVICE_gemtek_w1700k-ubi=y
 
 CONFIG_KERNEL_BUILD_USER="builder"
 CONFIG_KERNEL_BUILD_DOMAIN="buildhost"
+CONFIG_DEVEL=y
 CONFIG_CCACHE=y
 
 # -initramfs-recovery.itb, the recovery image.

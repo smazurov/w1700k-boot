@@ -1,0 +1,197 @@
+From 114678f273b2e3f0afba8ee5706fc4248a84a87f Mon Sep 17 00:00:00 2001
+From: Stepan Mazurov <smazurov@gmail.com>
+Date: Tue, 10 Nov 2026 19:18:29 -0700
+Subject: [PATCH 2/3] uboot-airoha: align the Gemtek W1700K chainloader with
+ the XR1710G
+
+The XR1710G chainloader was derived from the W1700K one and fixed on
+the way. Apply the same changes to the W1700K, so both boards boot,
+recover and install the same way:
+
+- CONFIG_PINCONF is replaced by CONFIG_PINCTRL_AIROHA_AN7581. Without
+  the pin controller driver the W1700K finds neither the reset button
+  nor the status LEDs ("LED 'status:red' not found (err=-19)").
+- bootcmd was "boot_ubi" without "run", and the default menu entry ran
+  boot_production only, so a broken production volume never fell back
+  to the recovery volume. Both now run boot_ubi, which falls back to
+  the recovery volume and then to TFTP until a server answers.
+  boot_recovery only runs bootm after the recovery volume was read.
+- Holding the reset button when the chainloader starts loads the
+  recovery image via TFTP. It has to be pressed after power is applied:
+  held at power-on, the vendor bootloader stops at "Press x".
+- A ubi partition that does not attach is formatted, missing ubootenv,
+  ubootenv2 and factory volumes are created, and the environment is
+  saved once, so fw_printenv and fw_setenv work. CONFIG_ENV_SIZE is the
+  size uboot-envtools uses, and MMC support is disabled: the board has
+  no eMMC, and the first saveenv went there.
+- The TFTP server is 192.168.1.254, as for other OpenWrt U-Boot boards.
+- The installer variable and menu entry are dropped: the factory volume
+  is now built by sysupgrade, so the device is installed by booting the
+  recovery image and running sysupgrade.
+- CONFIG_CMD_ASKENV is enabled, so failed menu entries wait for Enter.
+
+The patch is renamed to the 4xx range used by the other boards.
+
+Installation (via serial console):
+
+1. Connect to the UART header and interrupt the vendor bootloader.
+2. Make the vendor bootloader boot the chainloader from flash, write
+   the chainloader, and erase the rest of the stock firmware, which
+   keeps its own UBI in this area:
+
+     setenv serverip 192.168.1.254
+     setenv ipaddr 192.168.1.1
+     tftpboot 0x89000000 openwrt-airoha-an7581-gemtek_w1700k-ubi-chainload-uboot.itb
+     setenv one flash read 0x600000 0x100000 \$loadaddr
+     setenv two "; bootm"
+     setenv bootcmd "$one$two"
+     saveenv
+     flash erase 0x600000 0x100000
+     flash write 0x600000 0x100000 0x89000000
+     flash erase 0x700000 0x1b700000
+     reset
+
+   The vendor Ethernet driver is flaky; tftpboot may need a few
+   attempts, or use "loady 0x89000000" and YMODEM instead.
+3. The chainloader creates UBI with the ubootenv, ubootenv2 and an
+   empty factory volume, saves its environment and, with nothing to
+   boot, loads openwrt-airoha-an7581-gemtek_w1700k-ubi-initramfs-recovery.itb
+   via TFTP from 192.168.1.254.
+4. In the recovery system (192.168.1.1), run sysupgrade with the
+   sysupgrade.itb image. It fills the factory volume from the vendor
+   partition and installs OpenWrt.
+
+Devices installed with the UBI installer keep their volumes; the new
+chainloader only saves its environment on the first boot.
+
+Signed-off-by: Stepan Mazurov <smazurov@gmail.com>
+---
+ ...700k.patch => 404-add-gemtek-w1700k.patch} | 38 ++++++++++---------
+ 1 file changed, 21 insertions(+), 17 deletions(-)
+ rename package/boot/uboot-airoha/patches/{999-airoha-add-gemtek-w1700k.patch => 404-add-gemtek-w1700k.patch} (88%)
+
+diff --git a/package/boot/uboot-airoha/patches/999-airoha-add-gemtek-w1700k.patch b/package/boot/uboot-airoha/patches/404-add-gemtek-w1700k.patch
+similarity index 88%
+rename from package/boot/uboot-airoha/patches/999-airoha-add-gemtek-w1700k.patch
+rename to package/boot/uboot-airoha/patches/404-add-gemtek-w1700k.patch
+index 22393cd..00e1146 100644
+--- a/package/boot/uboot-airoha/patches/999-airoha-add-gemtek-w1700k.patch
++++ b/package/boot/uboot-airoha/patches/404-add-gemtek-w1700k.patch
+@@ -54,8 +54,7 @@ Signed-off-by: Kenneth Kasilag <kenneth@kasilag.me>
+ +CONFIG_TEXT_BASE=0x81E00000
+ +CONFIG_SYS_MALLOC_F_LEN=0x4000
+ +CONFIG_NR_DRAM_BANKS=1
+-+CONFIG_ENV_SIZE=0x4000
+-+CONFIG_ENV_OFFSET=0x7c000
+++CONFIG_ENV_SIZE=0x1f000
+ +CONFIG_DM_GPIO=y
+ +CONFIG_DEFAULT_DEVICE_TREE="airoha/an7581-w1700k-ubi"
+ +CONFIG_SYS_LOAD_ADDR=0x81800000
+@@ -64,6 +63,7 @@ Signed-off-by: Kenneth Kasilag <kenneth@kasilag.me>
+ +CONFIG_FIT=y
+ +CONFIG_FIT_VERBOSE=y
+ +CONFIG_BOOTDELAY=30
+++CONFIG_USE_PREBOOT=y
+ +CONFIG_DEFAULT_FDT_FILE="an7581-w1700k-ubi"
+ +CONFIG_SYS_PBSIZE=1049
+ +CONFIG_SYS_CONSOLE_IS_IN_ENV=y
+@@ -71,13 +71,13 @@ Signed-off-by: Kenneth Kasilag <kenneth@kasilag.me>
+ +CONFIG_HUSH_PARSER=y
+ +CONFIG_SYS_PROMPT="U-Boot> "
+ +CONFIG_SYS_MAXARGS=8
+++CONFIG_CMD_ASKENV=y
+ +CONFIG_CMD_BOOTZ=y
+ +CONFIG_CMD_BOOTMENU=y
+ +# CONFIG_CMD_ELF is not set
+ +# CONFIG_CMD_XIMG is not set
+ +CONFIG_CMD_BIND=y
+ +CONFIG_CMD_GPIO=y
+-+CONFIG_CMD_MMC=y
+ +CONFIG_CMD_MTD=y
+ +CONFIG_CMD_SF_TEST=y
+ +CONFIG_CMD_SPI=y
+@@ -90,7 +90,6 @@ Signed-off-by: Kenneth Kasilag <kenneth@kasilag.me>
+ +CONFIG_CMD_LOG=y
+ +CONFIG_OF_UPSTREAM=y
+ +CONFIG_ENV_OVERWRITE=y
+-+CONFIG_ENV_IS_IN_MMC=y
+ +# CONFIG_ENV_IS_IN_MTD is not set
+ +CONFIG_ENV_RELOC_GD_ENV_ADDR=y
+ +CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG=y
+@@ -98,12 +97,13 @@ Signed-off-by: Kenneth Kasilag <kenneth@kasilag.me>
+ +CONFIG_SYS_RX_ETH_BUFFER=8
+ +CONFIG_REGMAP=y
+ +CONFIG_SYSCON=y
+++CONFIG_BUTTON=y
+++CONFIG_BUTTON_GPIO=y
+ +CONFIG_CLK=y
+ +CONFIG_DMA=y
+ +CONFIG_LED=y
+ +CONFIG_LED_GPIO=y
+-+CONFIG_MMC_HS200_SUPPORT=y
+-+CONFIG_MMC_MTK=y
+++# CONFIG_MMC is not set
+ +CONFIG_MTD=y
+ +CONFIG_DM_MTD=y
+ +CONFIG_MTD_SPI_NAND=y
+@@ -122,7 +122,7 @@ Signed-off-by: Kenneth Kasilag <kenneth@kasilag.me>
+ +CONFIG_CMD_MDIO=y
+ +CONFIG_PHY=y
+ +CONFIG_PINCTRL=y
+-+CONFIG_PINCONF=y
+++CONFIG_PINCTRL_AIROHA_AN7581=y
+ +CONFIG_POWER_DOMAIN=y
+ +CONFIG_DM_REGULATOR=y
+ +CONFIG_DM_REGULATOR_FIXED=y
+@@ -154,34 +154,38 @@ Signed-off-by: Kenneth Kasilag <kenneth@kasilag.me>
+ +CONFIG_SHA512=y
+ --- /dev/null
+ +++ b/defenvs/an7581_w1700k_env
+-@@ -0,0 +1,27 @@
++@@ -0,0 +1,31 @@
+ +loadaddr=0x81800000
+ +initaddr=0x89000000
+ +ipaddr=192.168.1.1
+-+serverip=192.168.1.10
+++serverip=192.168.1.254
+ +bootfile=openwrt-airoha-an7581-gemtek_w1700k-ubi-initramfs-recovery.itb
+-+installfile=openwrt-airoha-an7581-gemtek_w1700k-ubi-initramfs-installer.itb
+ +bootled_pwr=status:red
+ +bootled_rec=status:blue
+-+boot_ubi=ubi part ubi && run boot_production ; run boot_recovery
+++boot_ubi=run ubi_prepare ; run boot_production ; run boot_recovery ; run boot_tftp_forever
+ +boot_production=led $bootled_pwr on ; run ubi_read_production && bootm $loadaddr#$bootconf ; led $bootled_pwr off
+-+boot_recovery=led $bootled_rec on ; run ubi_read_recovery ; bootm $initaddr#$bootconf ; led $bootled_rec off
+++boot_recovery=led $bootled_rec on ; run ubi_read_recovery && bootm $initaddr#$bootconf ; led $bootled_rec off
+ +boot_tftp=tftpboot $initaddr $bootfile && bootm $initaddr#$bootconf
+-+boot_installer=tftpboot $initaddr $installfile && bootm $initaddr#$bootconf
+++boot_tftp_forever=led $bootled_rec on ; while true ; do run boot_tftp ; sleep 1 ; done
+ +bootconf=config-1
+-+bootcmd=boot_ubi
+++bootcmd=run boot_ubi
+ +bootdelay=3
+ +bootmenu_confirm_return=askenv - Press ENTER to return to menu ; bootmenu 60
+ +bootmenu_default=0
+ +bootmenu_delay=3
+ +bootmenu_title=      34m( ( ( mOpenWrt34m ) ) )
+-+bootmenu_0=Run default boot command.=run boot_production
+++bootmenu_0=Run default boot command.=run bootcmd
+ +bootmenu_1=Boot system via TFTP.=run boot_tftp ; run bootmenu_confirm_return
+ +bootmenu_2=Boot recovery system from flash.=run boot_recovery ; run bootmenu_confirm_return
+-+bootmenu_3=Boot installer via TFTP.=run boot_installer ; run bootmenu_confirm_return
+-+bootmenu_4=Reboot.=reset
+++bootmenu_3=Reboot.=reset
+++check_buttons=if button reset ; then run boot_tftp_forever ; fi
+++preboot=run check_buttons
+ +ubi_read_production=ubi read $loadaddr fit && iminfo $loadaddr
+ +ubi_read_recovery=ubi check recovery && ubi read $initaddr recovery
+++ubi_prepare=ubi part ubi || run ubi_format ; run ubi_create_vols ; env exists _init_env && run _init_env
+++ubi_format=ubi detach ; mtd erase ubi && ubi part ubi ; reset
+++ubi_create_vols=ubi check ubootenv || ubi create ubootenv 0x1f000 dynamic ; ubi check ubootenv2 || ubi create ubootenv2 0x1f000 dynamic ; ubi check factory || ubi create factory 0x10000 static
+++_init_env=setenv _init_env ; saveenv ; saveenv
+ --- /dev/null
+ +++ b/dts/upstream/src/arm64/airoha/an7581-w1700k-ubi.dts
+ @@ -0,0 +1,131 @@
+-- 
+2.56.0
+

@@ -1,0 +1,67 @@
+From bc7e92c15a8570cd963888dbffee11a5f4462b6d Mon Sep 17 00:00:00 2001
+From: Stepan Mazurov <smazurov@gmail.com>
+Date: Tue, 10 Nov 2026 19:17:57 -0700
+Subject: [PATCH 1/3] airoha: an7581: rebuild the Gemtek W1700K factory volume
+
+The W1700K keeps the MT7996 EEPROM and its MAC addresses in the same
+place as the XR1710G: the DSD block at 0x400000 of the vendor partition
+holds wan_mac, lan_mac, fan_id and serial_number as text, and the EEPROM
+is in the first good block from 0x405000. The factory volume layout is
+the same as well (EEPROM at 0x0, WAN MAC at 0x5000, LAN MAC at 0x6000,
+fan_id at 0x7000, serial number at 0x8000); it is what the W1700K UBI
+installer has been writing.
+
+Let gemtek_prepare_factory() take the model the serial number has to
+start with and run it for the W1700K too, so a sysupgrade fills a
+missing or empty factory volume there as well. This lets the W1700K be
+installed without the out-of-tree installer, as the XR1710G is.
+
+Signed-off-by: Stepan Mazurov <smazurov@gmail.com>
+---
+ .../airoha/an7581/base-files/lib/upgrade/platform.sh | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/target/linux/airoha/an7581/base-files/lib/upgrade/platform.sh b/target/linux/airoha/an7581/base-files/lib/upgrade/platform.sh
+index 4f14168..e6fb684 100644
+--- a/target/linux/airoha/an7581/base-files/lib/upgrade/platform.sh
++++ b/target/linux/airoha/an7581/base-files/lib/upgrade/platform.sh
+@@ -26,6 +26,7 @@ gemtek_mac_bytes() {
+ # vendor partition, which the install leaves untouched. Rebuild it when it is
+ # missing or empty, as after the chainloader formatted the ubi partition.
+ gemtek_prepare_factory() {
++	local model="$1"
+ 	local ubidev vol mtd dsd ebs off eeprom wan lan fan serial mac
+ 	local blob="/tmp/factory.bin"
+ 
+@@ -44,9 +45,9 @@ gemtek_prepare_factory() {
+ 	serial="$(echo "$dsd" | sed -n '/^serial_number=/{s///p;q}')"
+ 
+ 	case "$serial" in
+-	XR1710G*) ;;
++	"$model"*) ;;
+ 	*)
+-		v "factory: serial number '$serial' does not match, not rebuilding"
++		v "factory: serial number '$serial' does not match $model, not rebuilding"
+ 		return 0
+ 		;;
+ 	esac
+@@ -121,11 +122,14 @@ platform_do_upgrade() {
+ 	local board=$(board_name)
+ 
+ 	case "$board" in
++		gemtek,w1700k-ubi)
++			gemtek_prepare_factory W1700K
++			fit_do_upgrade "$1"
++			;;
+ 		gemtek,xr1710g-ubi)
+-			gemtek_prepare_factory
++			gemtek_prepare_factory XR1710G
+ 			fit_do_upgrade "$1"
+ 			;;
+-		gemtek,w1700k-ubi|\
+ 		nokia,xg-040g-md-ubi|\
+ 		quantum,q1000k-ubi)
+ 			fit_do_upgrade "$1"
+-- 
+2.56.0
+

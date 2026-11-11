@@ -1,0 +1,51 @@
+From 177ff7d9449f9b6f6a2195e5073d8d1545e670f4 Mon Sep 17 00:00:00 2001
+From: Stepan Mazurov <smazurov@gmail.com>
+Date: Tue, 10 Nov 2026 19:18:58 -0700
+Subject: [PATCH 3/3] uboot-airoha: reserve a recovery volume on the Gemtek
+ W1700K
+
+sysupgrade creates rootfs_data with all the space left in UBI, so a
+recovery volume can only be added before the first sysupgrade, or by
+removing rootfs_data. The UBI installer sized it to its own recovery
+image, 91 LEBs (11,554,816 bytes), which a current recovery image no
+longer fits into: a snapshot build is 11,658,164 bytes without padding,
+and a release build also includes LuCI.
+
+Create a 32 MiB recovery volume together with the other volumes when
+the chainloader sets up UBI, before sysupgrade gives the rest to
+rootfs_data. This costs 8% of the 390 MiB rootfs_data and leaves room
+for the recovery image to grow. The volume starts out empty, which
+boot_recovery treats like a missing one (bootm fails on the erased
+data) and falls back to TFTP. The recovery image can be written to it
+from the recovery or the production system:
+
+  ubiupdatevol /dev/ubi0_N openwrt-airoha-an7581-gemtek_w1700k-ubi-initramfs-recovery.itb
+
+where ubi0_N is the volume named "recovery" (ubinfo -a). Once written,
+holding the reset button is no longer needed to recover from a broken
+production volume.
+
+Devices installed with the UBI installer already have a recovery volume
+and are left as they are.
+
+Signed-off-by: Stepan Mazurov <smazurov@gmail.com>
+---
+ package/boot/uboot-airoha/patches/404-add-gemtek-w1700k.patch | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/package/boot/uboot-airoha/patches/404-add-gemtek-w1700k.patch b/package/boot/uboot-airoha/patches/404-add-gemtek-w1700k.patch
+index 00e1146..5e01457 100644
+--- a/package/boot/uboot-airoha/patches/404-add-gemtek-w1700k.patch
++++ b/package/boot/uboot-airoha/patches/404-add-gemtek-w1700k.patch
+@@ -184,7 +184,7 @@ Signed-off-by: Kenneth Kasilag <kenneth@kasilag.me>
+ +ubi_read_recovery=ubi check recovery && ubi read $initaddr recovery
+ +ubi_prepare=ubi part ubi || run ubi_format ; run ubi_create_vols ; env exists _init_env && run _init_env
+ +ubi_format=ubi detach ; mtd erase ubi && ubi part ubi ; reset
+-+ubi_create_vols=ubi check ubootenv || ubi create ubootenv 0x1f000 dynamic ; ubi check ubootenv2 || ubi create ubootenv2 0x1f000 dynamic ; ubi check factory || ubi create factory 0x10000 static
+++ubi_create_vols=ubi check ubootenv || ubi create ubootenv 0x1f000 dynamic ; ubi check ubootenv2 || ubi create ubootenv2 0x1f000 dynamic ; ubi check factory || ubi create factory 0x10000 static ; ubi check recovery || ubi create recovery 0x2000000 dynamic
+ +_init_env=setenv _init_env ; saveenv ; saveenv
+ --- /dev/null
+ +++ b/dts/upstream/src/arm64/airoha/an7581-w1700k-ubi.dts
+-- 
+2.56.0
+

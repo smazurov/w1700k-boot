@@ -1,0 +1,17 @@
+CONFIG_TARGET_airoha=y
+CONFIG_TARGET_airoha_an7581=y
+CONFIG_TARGET_airoha_an7581_DEVICE_gemtek_w1700k-ubi=y
+
+CONFIG_KERNEL_BUILD_USER="builder"
+CONFIG_KERNEL_BUILD_DOMAIN="buildhost"
+CONFIG_CCACHE=y
+
+# -initramfs-recovery.itb, the recovery image.
+CONFIG_TARGET_ROOTFS_INITRAMFS=y
+
+# LuCI, as release builds have it: the closest stand-in for the 26.12 recovery image.
+CONFIG_PACKAGE_luci=y
+CONFIG_PACKAGE_luci-ssl=y
+
+# Per-package logs under openwrt/logs/ (no effect on the images).
+CONFIG_BUILD_LOG=y

@@ -80,6 +80,10 @@ FRESH=0
 
 # shellcheck disable=SC1091
 . /bld/settings.ini
+# What is built, recorded for release.sh: patches/, files/ and config.diff are read below, so the
+# w1700k-boot commit and whether the tree differs from it are taken now, not when make is done.
+SRC_COMMIT=$(git -C /bld rev-parse HEAD 2>/dev/null || echo unknown)
+SRC_DIRTY=$([ -z "$(git -C /bld status --porcelain 2>/dev/null)" ] && echo no || echo yes)
 
 cd /bld
 if [ ! -d openwrt/.git ]; then
@@ -147,6 +151,18 @@ grep -q 'ubi create recovery' "$env_file" && grep -q 'then run boot_rescue' "$en
 # The recovery identity is in the initramfs (files/ is copied into every image of this tree).
 grep -q 'w1700k-rescue' build_dir/target-*/root-airoha/etc/uci-defaults/99-rescue-identity ||
   { echo "build.sh: the recovery identity is missing from the root filesystem" >&2; exit 1; }
+banner=$(grep -a -o -m1 'U-Boot 20[0-9][0-9]\.[0-9][0-9]-OpenWrt-r[0-9]*-[0-9a-f]*' "$(dirname "$env_file")/../u-boot.bin")
+kernel=$(basename "$(echo build_dir/target-*/linux-airoha_an7581/linux-[0-9]*)")
+cat > "$OUT/w1700k-boot.info" <<INFO
+commit=$SRC_COMMIT
+dirty=$SRC_DIRTY
+built=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+base=$REPO_COMMIT
+revision=$(./scripts/getver.sh)
+uboot=$banner
+kernel=$kernel
+INFO
 ls -l "$CHAIN" "$REC"
 sha256sum "$CHAIN" "$REC"
+cat "$OUT/w1700k-boot.info"
 echo "build.sh: recovery $size of $RECOVERY_VOLUME B ($((size * 100 / RECOVERY_VOLUME))%)"

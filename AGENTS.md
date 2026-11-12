@@ -16,3 +16,5 @@ Read `README.md` first. Hardware facts and the station's rules live in
 - **Verify artifacts, not exit codes.** `build.sh` checks freshness, the recovery size against the
   reserved volume, and the patched U-Boot environment; keep those checks when changing it.
 - Commits in this repo: conventional (`type(scope): subject`), no trailers.
+- **Releases are public.** Publish with `./release.sh` only when the user asks. Never replace the
+  assets of a published release (stations may already have them); publish a new one.

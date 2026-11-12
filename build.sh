@@ -26,6 +26,16 @@ if [ ! -f /.dockerenv ]; then
     exit 1
   fi
 
+  # mkdir is atomic: closes the window before `make` exists in which a second build could start.
+  # Taken before the container is started, so a refused build leaves it as it was.
+  if ! mkdir "$DIR/.build.lock" 2>/dev/null; then
+    echo "A build is already running (lock: $DIR/.build.lock). Use ./build.sh --attach." >&2
+    echo "If no build is running, remove the lock directory." >&2
+    exit 1
+  fi
+  # `|| true`: errexit applies inside the trap too, and a failing command there skips the rest.
+  trap 'rmdir "$DIR/.build.lock" 2>/dev/null || true' EXIT
+
   if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
     echo "building $IMAGE from Dockerfile"
     docker build -q -t "$IMAGE" "$DIR" >/dev/null
@@ -41,14 +51,6 @@ if [ ! -f /.dockerenv ]; then
     exit 1
   fi
 
-  # mkdir is atomic: closes the window before `make` exists in which a second build could start.
-  if ! mkdir "$DIR/.build.lock" 2>/dev/null; then
-    echo "A build is already running (lock: $DIR/.build.lock). Use ./build.sh --attach." >&2
-    echo "If no build is running, remove the lock directory." >&2
-    exit 1
-  fi
-  trap 'rmdir "$DIR/.build.lock" 2>/dev/null' EXIT
-
   ID="$(date +%Y%m%d-%H%M%S)-$$"
   LOG="build-$ID.log"
   : > "$LOG"
@@ -61,7 +63,7 @@ if [ ! -f /.dockerenv ]; then
   echo "building -> $DIR/$LOG (symlinked as build.log)"
   tail -f "$LOG" &
   TAIL=$!
-  trap 'kill $TAIL 2>/dev/null; rmdir "$DIR/.build.lock" 2>/dev/null' EXIT
+  trap 'kill $TAIL 2>/dev/null || true; rmdir "$DIR/.build.lock" 2>/dev/null || true' EXIT
   while ! grep -q '^exit=' "$LOG"; do sleep 5; done
   kill $TAIL 2>/dev/null || true
   RC="$(sed -n 's/^exit=//p' "$LOG" | tail -1)"

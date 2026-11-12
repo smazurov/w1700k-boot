@@ -38,8 +38,8 @@ tag="$(info built | cut -c1-10 | tr - .)-${head:0:7}"
 row() {  # name, sha256, size of an artifact
   printf '`%s` | %s B | `%s`' "$(basename "$1")" "$(stat -c %s "$1")" "$(sha256sum "$1" | cut -d' ' -f1)"
 }
-patches=$(for p in patches/*.patch; do
-  sed -n 's/^Subject: \[PATCH[^]]*\] //p' "$p" | head -1 | sed 's/^/- /'
+patches=$(for p in patches/*.patch; do  # format-patch folds long subjects onto indented lines
+  awk '/^Subject: /{s=$0; while ((getline l) > 0 && l ~ /^ /) s = s l; sub(/^Subject: \[PATCH[^]]*\] /, "", s); print "- " s; exit}' "$p"
 done)
 base=$(info base)
 notes=$(mktemp)
@@ -54,7 +54,7 @@ official OpenWrt build.
 | $(row "$CHAIN") |
 | $(row "$REC") |
 
-- U-Boot \`$(info uboot | sed 's/^U-Boot //')\`; recovery image OpenWrt \`$(info revision)\`, $(info kernel), with LuCI.
+- U-Boot \`$(info uboot | sed 's/^U-Boot //')\`; recovery image OpenWrt \`$(info revision)\`, $(info kernel | sed 's/^linux-/Linux /'), with LuCI.
 - Base: [openwrt/openwrt#26296](https://github.com/openwrt/openwrt/pull/26296) at \`${base:0:7}\`, plus:
 $(echo "$patches" | sed 's/^/  /')
 - NAND: W25N04KV only. W25N04LV has no mainline driver yet (openwrt/openwrt#25532).

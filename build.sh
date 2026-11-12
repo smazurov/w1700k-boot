@@ -152,7 +152,7 @@ grep -q 'ubi create recovery' "$env_file" && grep -q 'then run boot_rescue' "$en
 grep -q 'w1700k-rescue' build_dir/target-*/root-airoha/etc/uci-defaults/99-rescue-identity ||
   { echo "build.sh: the recovery identity is missing from the root filesystem" >&2; exit 1; }
 banner=$(grep -a -o -m1 'U-Boot 20[0-9][0-9]\.[0-9][0-9]-OpenWrt-r[0-9]*-[0-9a-f]*' "$(dirname "$env_file")/../u-boot.bin")
-kernel=$(basename "$(echo build_dir/target-*/linux-airoha_an7581/linux-[0-9]*)")
+for d in build_dir/target-*/linux-airoha_an7581/linux-[0-9]*/; do kernel=$(basename "$d"); done  # the source dir
 cat > "$OUT/w1700k-boot.info" <<INFO
 commit=$SRC_COMMIT
 dirty=$SRC_DIRTY

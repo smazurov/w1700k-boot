@@ -1,7 +1,7 @@
-From 177ff7d9449f9b6f6a2195e5073d8d1545e670f4 Mon Sep 17 00:00:00 2001
+From de14bd95dfa85a3ab9482afb5142315837b298bd Mon Sep 17 00:00:00 2001
 From: Stepan Mazurov <smazurov@gmail.com>
 Date: Tue, 10 Nov 2026 19:18:58 -0700
-Subject: [PATCH 3/4] uboot-airoha: reserve a recovery volume on the Gemtek
+Subject: [PATCH 3/3] uboot-airoha: reserve a recovery volume on the Gemtek
  W1700K
 
 sysupgrade creates rootfs_data with all the space left in UBI, so a
@@ -34,10 +34,10 @@ Signed-off-by: Stepan Mazurov <smazurov@gmail.com>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/package/boot/uboot-airoha/patches/404-add-gemtek-w1700k.patch b/package/boot/uboot-airoha/patches/404-add-gemtek-w1700k.patch
-index 00e1146..5e01457 100644
+index 3111aea..311ebaa 100644
 --- a/package/boot/uboot-airoha/patches/404-add-gemtek-w1700k.patch
 +++ b/package/boot/uboot-airoha/patches/404-add-gemtek-w1700k.patch
-@@ -184,7 +184,7 @@ Signed-off-by: Kenneth Kasilag <kenneth@kasilag.me>
+@@ -185,7 +185,7 @@ Signed-off-by: Kenneth Kasilag <kenneth@kasilag.me>
  +ubi_read_recovery=ubi check recovery && ubi read $initaddr recovery
  +ubi_prepare=ubi part ubi || run ubi_format ; run ubi_create_vols ; env exists _init_env && run _init_env
  +ubi_format=ubi detach ; mtd erase ubi && ubi part ubi ; reset

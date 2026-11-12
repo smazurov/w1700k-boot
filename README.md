@@ -19,13 +19,13 @@ The patches:
    sysupgrade for the W1700K too, so no out-of-tree installer is needed.
 2. The W1700K chainloader gets #26296's fixes: reset button and LEDs (pin controller), `run` in
    `bootcmd`, fallback production → recovery → TFTP, UBI format and volume creation, environment
-   saved on first boot, TFTP server `192.168.1.254`, no installer entries.
+   saved on first boot, TFTP server `192.168.1.254`, no installer entries. One difference from the
+   XR1710G, which goes straight to TFTP: holding reset boots the recovery volume, then TFTP if
+   that fails. Hold it from the red status LED until it turns blue; the recovery system answers
+   with LuCI at `192.168.1.1` without needing a TFTP server.
 3. The chainloader reserves a 32 MiB `recovery` volume when it creates UBI, before sysupgrade
    gives the rest to `rootfs_data`. The installer's 91-LEB volume could not hold a current
    recovery image (11,658,164 B for a snapshot, more with LuCI).
-4. Holding reset boots the recovery volume, then TFTP if that fails (the XR1710G goes straight
-   to TFTP). Hold it from the red status LED until it turns blue; the recovery system answers
-   with LuCI at `192.168.1.1` without needing a TFTP server.
 
 ## The install this targets
 
@@ -62,3 +62,21 @@ git format-patch <pin>..w1700k-ubi-layout -o ~/dev/w1700k-boot/patches
 ```
 
 When #26296 is rebased or merged, move the branch onto the new base and bump `settings.ini`.
+
+## Releasing
+
+Builds are published as releases of [smazurov/w1700k-boot](https://github.com/smazurov/w1700k-boot);
+the W1700K flasher's release catalog lists them and downloads a release into the station's
+`bundles/<tag>/`.
+
+```sh
+git push                  # a release names the commit it was built from
+./build.sh
+./release.sh --dry-run    # the tag and the notes
+./release.sh              # gh release create, then GitHub's digests are checked against the files
+```
+
+`release.sh` publishes only a successful build of a clean tree at `HEAD`, with `HEAD` on
+`origin/main`; `build.sh` records what it built in `w1700k-boot.info` next to the images. A tag is
+the build date and commit (`2026.11.12-fc5ed90`), because the banner hash (`r0-<hash>`) changes
+only with `patches/`, not with `files/` or `config.diff`.

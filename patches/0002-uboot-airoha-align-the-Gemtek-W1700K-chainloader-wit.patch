@@ -1,12 +1,13 @@
-From 114678f273b2e3f0afba8ee5706fc4248a84a87f Mon Sep 17 00:00:00 2001
+From 70e97ef52ad164fb3a44c8ae6171a5702149b726 Mon Sep 17 00:00:00 2001
 From: Stepan Mazurov <smazurov@gmail.com>
 Date: Tue, 10 Nov 2026 19:18:29 -0700
-Subject: [PATCH 2/4] uboot-airoha: align the Gemtek W1700K chainloader with
+Subject: [PATCH 2/3] uboot-airoha: align the Gemtek W1700K chainloader with
  the XR1710G
 
 The XR1710G chainloader was derived from the W1700K one and fixed on
-the way. Apply the same changes to the W1700K, so both boards boot,
-recover and install the same way:
+the way. Apply the same changes to the W1700K, so both boards boot and
+install the same way, and let its reset button boot the recovery
+volume:
 
 - CONFIG_PINCONF is replaced by CONFIG_PINCTRL_AIROHA_AN7581. Without
   the pin controller driver the W1700K finds neither the reset button
@@ -16,9 +17,16 @@ recover and install the same way:
   to the recovery volume. Both now run boot_ubi, which falls back to
   the recovery volume and then to TFTP until a server answers.
   boot_recovery only runs bootm after the recovery volume was read.
-- Holding the reset button when the chainloader starts loads the
-  recovery image via TFTP. It has to be pressed after power is applied:
-  held at power-on, the vendor bootloader stops at "Press x".
+- Holding the reset button when the chainloader starts boots the
+  recovery volume, and falls back to TFTP when the volume is empty or
+  does not boot. The XR1710G goes to TFTP directly, which needs a
+  computer at 192.168.1.254 running a TFTP server; the recovery volume
+  already holds the recovery image, so the W1700K boots that first, as
+  the Mercusys MR85X does. The red status LED turns off and the blue
+  one on. The button has to be pressed after power is applied: held at
+  power-on, the vendor bootloader stops at "Press x". Holding it from
+  the red status LED until it turns blue boots the recovery system,
+  with LuCI at 192.168.1.1, and leaves the production volumes alone.
 - A ubi partition that does not attach is formatted, missing ubootenv,
   ubootenv2 and factory volumes are created, and the environment is
   saved once, so fw_printenv and fw_setenv work. CONFIG_ENV_SIZE is the
@@ -66,15 +74,15 @@ chainloader only saves its environment on the first boot.
 
 Signed-off-by: Stepan Mazurov <smazurov@gmail.com>
 ---
- ...700k.patch => 404-add-gemtek-w1700k.patch} | 38 ++++++++++---------
- 1 file changed, 21 insertions(+), 17 deletions(-)
- rename package/boot/uboot-airoha/patches/{999-airoha-add-gemtek-w1700k.patch => 404-add-gemtek-w1700k.patch} (88%)
+ ...700k.patch => 404-add-gemtek-w1700k.patch} | 39 +++++++++++--------
+ 1 file changed, 22 insertions(+), 17 deletions(-)
+ rename package/boot/uboot-airoha/patches/{999-airoha-add-gemtek-w1700k.patch => 404-add-gemtek-w1700k.patch} (87%)
 
 diff --git a/package/boot/uboot-airoha/patches/999-airoha-add-gemtek-w1700k.patch b/package/boot/uboot-airoha/patches/404-add-gemtek-w1700k.patch
-similarity index 88%
+similarity index 87%
 rename from package/boot/uboot-airoha/patches/999-airoha-add-gemtek-w1700k.patch
 rename to package/boot/uboot-airoha/patches/404-add-gemtek-w1700k.patch
-index 22393cd..00e1146 100644
+index 22393cd..3111aea 100644
 --- a/package/boot/uboot-airoha/patches/999-airoha-add-gemtek-w1700k.patch
 +++ b/package/boot/uboot-airoha/patches/404-add-gemtek-w1700k.patch
 @@ -54,8 +54,7 @@ Signed-off-by: Kenneth Kasilag <kenneth@kasilag.me>
@@ -143,12 +151,12 @@ index 22393cd..00e1146 100644
  +CONFIG_POWER_DOMAIN=y
  +CONFIG_DM_REGULATOR=y
  +CONFIG_DM_REGULATOR_FIXED=y
-@@ -154,34 +154,38 @@ Signed-off-by: Kenneth Kasilag <kenneth@kasilag.me>
+@@ -154,34 +154,39 @@ Signed-off-by: Kenneth Kasilag <kenneth@kasilag.me>
  +CONFIG_SHA512=y
  --- /dev/null
  +++ b/defenvs/an7581_w1700k_env
 -@@ -0,0 +1,27 @@
-+@@ -0,0 +1,31 @@
++@@ -0,0 +1,32 @@
  +loadaddr=0x81800000
  +initaddr=0x89000000
  +ipaddr=192.168.1.1
@@ -166,6 +174,7 @@ index 22393cd..00e1146 100644
  +boot_tftp=tftpboot $initaddr $bootfile && bootm $initaddr#$bootconf
 -+boot_installer=tftpboot $initaddr $installfile && bootm $initaddr#$bootconf
 ++boot_tftp_forever=led $bootled_rec on ; while true ; do run boot_tftp ; sleep 1 ; done
+++boot_rescue=led $bootled_pwr off ; run ubi_prepare ; run boot_recovery ; run boot_tftp_forever
  +bootconf=config-1
 -+bootcmd=boot_ubi
 ++bootcmd=run boot_ubi
@@ -181,7 +190,7 @@ index 22393cd..00e1146 100644
 -+bootmenu_3=Boot installer via TFTP.=run boot_installer ; run bootmenu_confirm_return
 -+bootmenu_4=Reboot.=reset
 ++bootmenu_3=Reboot.=reset
-++check_buttons=if button reset ; then run boot_tftp_forever ; fi
+++check_buttons=if button reset ; then run boot_rescue ; fi
 ++preboot=run check_buttons
  +ubi_read_production=ubi read $loadaddr fit && iminfo $loadaddr
  +ubi_read_recovery=ubi check recovery && ubi read $initaddr recovery

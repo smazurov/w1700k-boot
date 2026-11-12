@@ -1,0 +1,60 @@
+From 313538f1736f5e94b8878c05fc74769c4c8566db Mon Sep 17 00:00:00 2001
+From: Stepan Mazurov <smazurov@gmail.com>
+Date: Wed, 11 Nov 2026 18:39:11 -0700
+Subject: [PATCH 4/4] uboot-airoha: boot the W1700K recovery volume on reset
+
+The chainloader only falls back to the recovery volume when it cannot
+read or start the production image. A production system that boots but
+then panics, hangs or is misconfigured is booted again on every power
+cycle, and the reset button is the way out. Holding it sent the
+chainloader straight to TFTP, which needs a computer at 192.168.1.254
+running a TFTP server with the recovery image.
+
+The recovery volume in flash already holds that image. Holding reset
+now boots it first, as on the Mercusys MR85X, and only falls back to
+TFTP when the volume is empty or does not boot. The production LED is
+turned off so the blue recovery LED shows which path was taken.
+
+Holding reset from the red status LED until it turns blue boots the
+recovery system in RAM, with LuCI at 192.168.1.1, and leaves the
+production volumes as they are. Tested on a W1700K with these two
+variables set in its saved environment.
+
+Signed-off-by: Stepan Mazurov <smazurov@gmail.com>
+---
+ .../boot/uboot-airoha/patches/404-add-gemtek-w1700k.patch    | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/package/boot/uboot-airoha/patches/404-add-gemtek-w1700k.patch b/package/boot/uboot-airoha/patches/404-add-gemtek-w1700k.patch
+index 5e01457..311ebaa 100644
+--- a/package/boot/uboot-airoha/patches/404-add-gemtek-w1700k.patch
++++ b/package/boot/uboot-airoha/patches/404-add-gemtek-w1700k.patch
+@@ -154,7 +154,7 @@ Signed-off-by: Kenneth Kasilag <kenneth@kasilag.me>
+ +CONFIG_SHA512=y
+ --- /dev/null
+ +++ b/defenvs/an7581_w1700k_env
+-@@ -0,0 +1,31 @@
++@@ -0,0 +1,32 @@
+ +loadaddr=0x81800000
+ +initaddr=0x89000000
+ +ipaddr=192.168.1.1
+@@ -167,6 +167,7 @@ Signed-off-by: Kenneth Kasilag <kenneth@kasilag.me>
+ +boot_recovery=led $bootled_rec on ; run ubi_read_recovery && bootm $initaddr#$bootconf ; led $bootled_rec off
+ +boot_tftp=tftpboot $initaddr $bootfile && bootm $initaddr#$bootconf
+ +boot_tftp_forever=led $bootled_rec on ; while true ; do run boot_tftp ; sleep 1 ; done
+++boot_rescue=led $bootled_pwr off ; run ubi_prepare ; run boot_recovery ; run boot_tftp_forever
+ +bootconf=config-1
+ +bootcmd=run boot_ubi
+ +bootdelay=3
+@@ -178,7 +179,7 @@ Signed-off-by: Kenneth Kasilag <kenneth@kasilag.me>
+ +bootmenu_1=Boot system via TFTP.=run boot_tftp ; run bootmenu_confirm_return
+ +bootmenu_2=Boot recovery system from flash.=run boot_recovery ; run bootmenu_confirm_return
+ +bootmenu_3=Reboot.=reset
+-+check_buttons=if button reset ; then run boot_tftp_forever ; fi
+++check_buttons=if button reset ; then run boot_rescue ; fi
+ +preboot=run check_buttons
+ +ubi_read_production=ubi read $loadaddr fit && iminfo $loadaddr
+ +ubi_read_recovery=ubi check recovery && ubi read $initaddr recovery
+-- 
+2.56.0
+

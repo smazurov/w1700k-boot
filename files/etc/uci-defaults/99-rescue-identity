@@ -1,0 +1,31 @@
+#!/bin/sh
+# The recovery system (the initramfs the chainloader boots from the `recovery` volume, by TFTP,
+# or when reset is held) gets a slowly blinking blue status LED (1 s on, 1 s off) and nothing else,
+# plus a hostname that says what it is, so it is never mistaken for production: both end up with a
+# green LED otherwise. OpenWrt blinks the same LED faster in failsafe (50 ms) and sysupgrade (200 ms).
+# /etc/init.d/led (START=96) applies these after /etc/init.d/done (START=95) has lit the DT
+# "running" LED. The sysupgrade image of this tree runs from squashfs and is left alone.
+[ "$(awk '$2 == "/" { t = $3 } END { print t }' /proc/mounts)" = tmpfs ] || exit 0
+
+uci -q batch <<-EOT
+	set system.@system[0].hostname='w1700k-rescue'
+	set system.led_rescue_green=led
+	set system.led_rescue_green.sysfs='green:status'
+	set system.led_rescue_green.trigger='none'
+	set system.led_rescue_green.default='0'
+	set system.led_rescue_red=led
+	set system.led_rescue_red.sysfs='red:status'
+	set system.led_rescue_red.trigger='none'
+	set system.led_rescue_red.default='0'
+	set system.led_rescue_white=led
+	set system.led_rescue_white.sysfs='white:status'
+	set system.led_rescue_white.trigger='none'
+	set system.led_rescue_white.default='0'
+	set system.led_rescue_blue=led
+	set system.led_rescue_blue.sysfs='blue:status'
+	set system.led_rescue_blue.trigger='timer'
+	set system.led_rescue_blue.delayon='1000'
+	set system.led_rescue_blue.delayoff='1000'
+	commit system
+EOT
+exit 0

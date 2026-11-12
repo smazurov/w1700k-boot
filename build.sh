@@ -142,8 +142,11 @@ size=$(stat -c %s "$REC")
 [ "$size" -le "$RECOVERY_VOLUME" ] || { echo "build.sh: recovery is $size B, volume holds $RECOVERY_VOLUME B" >&2; exit 1; }
 # The chainloader was built from the patched environment, not a stale build_dir.
 env_file=$(echo build_dir/target-*/u-boot-an7581_gemtek_w1700k/u-boot-*/defenvs/an7581_w1700k_env)
-grep -q 'ubi create recovery' "$env_file" ||
+grep -q 'ubi create recovery' "$env_file" && grep -q 'then run boot_rescue' "$env_file" ||
   { echo "build.sh: $env_file lacks the patched environment" >&2; exit 1; }
+# The recovery identity is in the initramfs (files/ is copied into every image of this tree).
+grep -q 'w1700k-rescue' build_dir/target-*/root-airoha/etc/uci-defaults/99-rescue-identity ||
+  { echo "build.sh: the recovery identity is missing from the root filesystem" >&2; exit 1; }
 ls -l "$CHAIN" "$REC"
 sha256sum "$CHAIN" "$REC"
 echo "build.sh: recovery $size of $RECOVERY_VOLUME B ($((size * 100 / RECOVERY_VOLUME))%)"

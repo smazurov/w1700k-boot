@@ -1,7 +1,7 @@
 From 114678f273b2e3f0afba8ee5706fc4248a84a87f Mon Sep 17 00:00:00 2001
 From: Stepan Mazurov <smazurov@gmail.com>
 Date: Tue, 10 Nov 2026 19:18:29 -0700
-Subject: [PATCH 2/3] uboot-airoha: align the Gemtek W1700K chainloader with
+Subject: [PATCH 2/4] uboot-airoha: align the Gemtek W1700K chainloader with
  the XR1710G
 
 The XR1710G chainloader was derived from the W1700K one and fixed on

@@ -11,6 +11,7 @@ them itself. The W1700K flasher installs these on stock units.
 | Base | [openwrt/openwrt#26296](https://github.com/openwrt/openwrt/pull/26296) at `settings.ini`'s pin: XR1710G support, the shared Gemtek DTS, the factory-volume rebuild in `platform.sh`, and the fixed XR1710G chainloader |
 | `patches/` | The W1700K follow-up the #26296 reviewers asked for, as `git am` patches. Drafted on branch `w1700k-ubi-layout` in `~/dev/openwrt-w1700k`; this is the upstream PR to be |
 | `config.diff` | The W1700K device, its initramfs (the recovery image) and LuCI, as in release builds |
+| `files/` | Local only, not for upstream: the recovery system's identity (blue status LED blinking slowly, 1 s on and 1 s off; hostname `w1700k-rescue`), applied only when running from RAM |
 
 The patches:
 
@@ -22,6 +23,9 @@ The patches:
 3. The chainloader reserves a 32 MiB `recovery` volume when it creates UBI, before sysupgrade
    gives the rest to `rootfs_data`. The installer's 91-LEB volume could not hold a current
    recovery image (11,658,164 B for a snapshot, more with LuCI).
+4. Holding reset boots the recovery volume, then TFTP if that fails (the XR1710G goes straight
+   to TFTP). Hold it from the red status LED until it turns blue; the recovery system answers
+   with LuCI at `192.168.1.1` without needing a TFTP server.
 
 ## The install this targets
 

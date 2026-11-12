@@ -1,7 +1,7 @@
 From 177ff7d9449f9b6f6a2195e5073d8d1545e670f4 Mon Sep 17 00:00:00 2001
 From: Stepan Mazurov <smazurov@gmail.com>
 Date: Tue, 10 Nov 2026 19:18:58 -0700
-Subject: [PATCH 3/3] uboot-airoha: reserve a recovery volume on the Gemtek
+Subject: [PATCH 3/4] uboot-airoha: reserve a recovery volume on the Gemtek
  W1700K
 
 sysupgrade creates rootfs_data with all the space left in UBI, so a

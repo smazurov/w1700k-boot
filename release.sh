@@ -53,8 +53,8 @@ else
 fi
 
 # GitHub renders a release body's newlines as line breaks: one line per paragraph and bullet.
-row() {  # a table row: name, size, sha256 of an artifact
-  printf '| `%s` | %s | `%s` |' "$(basename "$1")" "$(stat -c %s "$1")" "$(sha256sum "$1" | cut -d' ' -f1)"
+row() {  # a table row: name and size of an artifact (GitHub shows each asset's sha256 itself)
+  printf '| `%s` | %s |' "$(basename "$1")" "$(stat -c %s "$1" | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta')"
 }
 patches=$(git ls-tree --name-only "$built" patches/ | while read -r p; do  # as built, not as HEAD has them
   git show "$built:$p" | awk '/^Subject: /{s=$0; while ((getline l) > 0 && l ~ /^ /) s = s l; sub(/^Subject: \[PATCH[^]]*\] /, "", s); print "  - " s; exit}'
@@ -65,8 +65,8 @@ trap 'rm -f "$notes"' EXIT
 cat > "$notes" <<NOTES
 Gemtek W1700K chainloader and recovery image for the UBI layout OpenWrt 26.12 is expected to ship, built from [${built:0:7}](https://github.com/$REPO/tree/$built). Not an official OpenWrt build.
 
-| File | Bytes | sha256 |
-|---|---|---|
+| File | Bytes |
+|---|--:|
 $(row "$CHAIN")
 $(row "$REC")
 
